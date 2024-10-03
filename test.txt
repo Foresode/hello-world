@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'dart:convert';
 
 class WebViewCachePage extends StatefulWidget {
   @override
@@ -10,7 +9,28 @@ class WebViewCachePage extends StatefulWidget {
 }
 
 class _WebViewCachePageState extends State<WebViewCachePage> {
-  WebViewController _controller;
+  late final WebViewController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 初始化 WebViewController
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted) // 启用JavaScript
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (url) async {
+            // 获取网页内容并缓存到本地
+            String htmlContent = await _controller.runJavaScriptReturningResult(
+              "window.document.getElementsByTagName('html')[0].outerHTML;"
+            ) as String;
+            await _cacheHtmlContent(htmlContent);
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse('https://example.com')); // 设置要加载的网页URL
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,23 +38,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       appBar: AppBar(
         title: Text('Web Page Cache'),
       ),
-      body: WebView(
-        initialUrl: 'https://example.com', // 替换为你要缓存的网页地址
-        javascriptMode: JavascriptMode.unrestricted,
-        onPageFinished: (url) async {
-          // 确保 WebViewController 已初始化
-          if (_controller != null) {
-            // 获取网页内容并缓存到本地
-            String htmlContent = await _controller.evaluateJavascript(
-              "window.document.getElementsByTagName('html')[0].outerHTML;"
-            );
-            await _cacheHtmlContent(htmlContent);
-          }
-        },
-        onWebViewCreated: (WebViewController webViewController) {
-          _controller = webViewController; // 初始化 WebViewController
-        },
-      ),
+      body: WebViewWidget(controller: _controller), // 使用WebViewWidget显示WebView
       floatingActionButton: FloatingActionButton(
         onPressed: _loadCachedPage, // 手动加载缓存的网页
         child: Icon(Icons.offline_pin),
@@ -56,16 +60,17 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     final file = File('${directory.path}/cached_page.html');
     if (await file.exists()) {
       String cachedHtml = await file.readAsString();
-      _controller.loadUrl(Uri.dataFromString(
+      _controller.loadRequest(Uri.dataFromString(
         cachedHtml,
         mimeType: 'text/html',
         encoding: Encoding.getByName('utf-8'),
-      ).toString());
+      ));
     } else {
       print('No cached page available');
     }
   }
 }
+
 
 
 
