@@ -2,6 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter WebView Cache Demo',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: WebViewCachePage(),
+    );
+  }
+}
 
 class WebViewCachePage extends StatefulWidget {
   @override
@@ -17,7 +36,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
 
     // 初始化 WebViewController
     _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted) // 启用JavaScript
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (url) async {
@@ -28,8 +47,10 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
             await _cacheHtmlContent(htmlContent);
           },
         ),
-      )
-      ..loadRequest(Uri.parse('https://example.com')); // 设置要加载的网页URL
+      );
+
+    // 检查网络并加载相应的页面
+    _checkNetworkAndLoadPage();
   }
 
   @override
@@ -38,12 +59,24 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       appBar: AppBar(
         title: Text('Web Page Cache'),
       ),
-      body: WebViewWidget(controller: _controller), // 使用WebViewWidget显示WebView
+      body: WebViewWidget(controller: _controller),
       floatingActionButton: FloatingActionButton(
-        onPressed: _loadCachedPage, // 手动加载缓存的网页
+        onPressed: _loadCachedPage,
         child: Icon(Icons.offline_pin),
       ),
     );
+  }
+
+  // 检查网络状态并加载页面
+  Future<void> _checkNetworkAndLoadPage() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      // 没有网络时加载缓存的页面
+      await _loadCachedPage();
+    } else {
+      // 有网络时加载在线网页
+      _controller.loadRequest(Uri.parse('https://example.com'));
+    }
   }
 
   // 缓存网页内容到本地文件
@@ -70,21 +103,3 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     }
   }
 }
-
-
-
-
-import 'package:connectivity_plus/connectivity_plus.dart';
-
-Future<void> _checkNetworkAndLoadPage() async {
-  var connectivityResult = await Connectivity().checkConnectivity();
-  if (connectivityResult == ConnectivityResult.none) {
-    // 没有网络时加载缓存的页面
-    await _loadCachedPage();
-  } else {
-    // 有网络时加载在线网页
-    _controller.loadUrl('https://example.com');
-  }
-}
-
-
