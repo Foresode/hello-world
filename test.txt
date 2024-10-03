@@ -1,2 +1,75 @@
-666
-1111111111111111111
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+class WebViewCachePage extends StatefulWidget {
+  @override
+  _WebViewCachePageState createState() => _WebViewCachePageState();
+}
+
+class _WebViewCachePageState extends State<WebViewCachePage> {
+  WebViewController _controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Web Page Cache'),
+      ),
+      body: WebView(
+        initialUrl: 'https://example.com', // 替换为你想缓存的网址
+        javascriptMode: JavascriptMode.unrestricted,
+        onPageFinished: (url) async {
+          // 获取网页内容并缓存到本地
+          String htmlContent = await _controller.evaluateJavascript(
+              "window.document.getElementsByTagName('html')[0].outerHTML;");
+          await _cacheHtmlContent(htmlContent);
+        },
+        onWebViewCreated: (controller) {
+          _controller = controller;
+        },
+      ),
+    );
+  }
+
+  // 缓存网页内容到本地文件
+  Future<void> _cacheHtmlContent(String content) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/cached_page.html');
+    await file.writeAsString(content);
+  }
+}
+
+
+Future<void> _loadCachedPage() async {
+  final directory = await getApplicationDocumentsDirectory();
+  final file = File('${directory.path}/cached_page.html');
+  if (await file.exists()) {
+    String cachedHtml = await file.readAsString();
+    _controller.loadUrl(Uri.dataFromString(
+      cachedHtml,
+      mimeType: 'text/html',
+      encoding: Encoding.getByName('utf-8'),
+    ).toString());
+  } else {
+    // 缓存不存在时提示用户
+    print('No cached page available');
+  }
+}
+
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+Future<void> _checkNetworkAndLoadPage() async {
+  var connectivityResult = await Connectivity().checkConnectivity();
+  if (connectivityResult == ConnectivityResult.none) {
+    // 没有网络时加载缓存的页面
+    await _loadCachedPage();
+  } else {
+    // 有网络时加载在线网页
+    _controller.loadUrl('https://example.com');
+  }
+}
+
+
