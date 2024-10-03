@@ -59,7 +59,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _checkNetworkAndLoadPage,  // 刷新页面
+            onPressed: _checkCacheThenLoad,  // 刷新页面时优先走缓存再联网加载
           ),
         ],
       ),
@@ -77,12 +77,12 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.url,
-                    onSubmitted: (_) => _checkNetworkAndLoadPage(), // 输入网址后加载页面
+                    onSubmitted: (_) => _checkCacheThenLoad(), // 输入网址后优先走缓存再联网加载
                   ),
                 ),
                 IconButton(
                   icon: Icon(Icons.arrow_forward),
-                  onPressed: _checkNetworkAndLoadPage, // 点击箭头加载页面
+                  onPressed: _checkCacheThenLoad, // 点击箭头优先走缓存再联网加载
                 ),
               ],
             ),
@@ -95,8 +95,8 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     );
   }
 
-  // 检查网络状态并加载页面
-  Future<void> _checkNetworkAndLoadPage() async {
+  // 优先加载缓存页面，再检查网络并加载在线页面
+  Future<void> _checkCacheThenLoad() async {
     String url = _urlController.text.trim();
 
     // 如果用户输入的网址没有 http 前缀，自动添加
@@ -104,13 +104,45 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       url = 'https://' + url;
     }
 
+    // 1. 尝试加载本地缓存的页面
+    bool cacheLoaded = await _loadCachedPage(url);
+
+    // 2. 检查网络状态并加载在线页面，如果网络可用则替换缓存
     var connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult == ConnectivityResult.none) {
-      print('No network connection, loading cached page...');
-      await _loadCachedPage(url);
-    } else {
+    if (connectivityResult != ConnectivityResult.none) {
       print('Network available, loading online page...');
-      _controller.loadRequest(Uri.parse(url));
+      _controller.loadRequest(Uri.parse(url)).then((_) {
+        print('Online page loaded, caching new content...');
+      });
+    } else if (!cacheLoaded) {
+      // 如果没有缓存且无网络，显示错误信息
+      _showNoConnectionMessage();
+    }
+  }
+
+  // 从本地缓存加载页面，返回是否成功加载缓存
+  Future<bool> _loadCachedPage(String url) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/cached_${_sanitizeUrl(url)}.html');
+      if (await file.exists()) {
+        String cachedHtml = await file.readAsString();
+        print('Loaded cached page successfully');
+
+        // 加载缓存页面
+        _controller.loadRequest(Uri.dataFromString(
+          cachedHtml,
+          mimeType: 'text/html',
+          encoding: Encoding.getByName('utf-8'),
+        ));
+        return true; // 成功加载缓存
+      } else {
+        print('No cached page available for this URL');
+        return false; // 没有找到缓存
+      }
+    } catch (e) {
+      print('Failed to load cached page: $e');
+      return false; // 加载缓存失败
     }
   }
 
@@ -126,27 +158,23 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     }
   }
 
-  // 从本地文件加载缓存的页面
-  Future<void> _loadCachedPage(String url) async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/cached_${_sanitizeUrl(url)}.html');
-      if (await file.exists()) {
-        String cachedHtml = await file.readAsString();
-        print('Loaded cached page successfully');
-
-        // 加载缓存页面
-        _controller.loadRequest(Uri.dataFromString(
-          cachedHtml,
-          mimeType: 'text/html',
-          encoding: Encoding.getByName('utf-8'),
-        ));
-      } else {
-        print('No cached page available for this URL');
-      }
-    } catch (e) {
-      print('Failed to load cached page: $e');
-    }
+  // 显示无连接时的错误信息
+  void _showNoConnectionMessage() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('No Connection'),
+        content: Text('No internet connection and no cached page available.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   // 清理 URL 以便用作文件名
