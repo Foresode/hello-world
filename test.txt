@@ -30,6 +30,7 @@ class WebViewCachePage extends StatefulWidget {
 class _WebViewCachePageState extends State<WebViewCachePage> {
   late final WebViewController _controller;
   final TextEditingController _urlController = TextEditingController(text: 'https://example.com');
+  bool _isAlertShown = false; // 防止重复弹出对话框
 
   @override
   void initState() {
@@ -128,7 +129,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     if (connectivityResult == ConnectivityResult.none) {
       print('No network, loading cached page...');
       bool cacheLoaded = await _loadCachedPage(url);
-      if (!cacheLoaded) {
+      if (!cacheLoaded && !_isAlertShown) {
         _showNoConnectionMessage(); // 没有网络且没有缓存时，显示提示
       }
     } else {
@@ -186,6 +187,9 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
 
   // 显示无连接时的错误信息
   void _showNoConnectionMessage() {
+    if (_isAlertShown) return;  // 防止重复弹出对话框
+
+    _isAlertShown = true;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -194,6 +198,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
         actions: [
           TextButton(
             onPressed: () {
+              _isAlertShown = false;
               Navigator.of(context).pop();
             },
             child: Text('OK'),
