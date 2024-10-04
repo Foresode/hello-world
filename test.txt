@@ -42,12 +42,17 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
         NavigationDelegate(
           onPageFinished: (url) async {
             try {
-              // 当页面加载完成时，缓存页面内容到本地
+              // 缓存页面内容
               String htmlContent = await _controller.runJavaScriptReturningResult(
                 "window.document.getElementsByTagName('html')[0].outerHTML;"
               ) as String;
-              await _cacheHtmlContent(_urlController.text, htmlContent);
-              print('Page cached successfully');
+
+              if (htmlContent.isNotEmpty) {
+                await _cacheHtmlContent(_urlController.text, htmlContent);
+                print('Page cached successfully');
+              } else {
+                print('Failed to retrieve page content for caching');
+              }
             } catch (e) {
               print('Error caching page: $e');
             }
@@ -139,11 +144,14 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
   Future<bool> _loadCachedPage(String url) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/cached_${_sanitizeUrl(url)}.html');
+      final filePath = '${directory.path}/cached_${_sanitizeUrl(url)}.html';
+      final file = File(filePath);
+      print('Attempting to load cached page from $filePath'); // 输出加载的缓存路径
+
       if (await file.exists()) {
         String cachedHtml = await file.readAsString();
-        print('Loaded cached page successfully: $cachedHtml');
-
+        print('Cached page loaded successfully');
+        
         // 使用本地缓存内容加载 WebView
         _controller.loadRequest(
           Uri.dataFromString(
@@ -159,7 +167,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       }
     } catch (e) {
       print('Failed to load cached page: $e');
-      return false; // 加载缓存失败
+      return false;
     }
   }
 
@@ -167,9 +175,10 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
   Future<void> _cacheHtmlContent(String url, String content) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/cached_${_sanitizeUrl(url)}.html');
+      final filePath = '${directory.path}/cached_${_sanitizeUrl(url)}.html';
+      final file = File(filePath);
       await file.writeAsString(content);
-      print('HTML content cached successfully at ${file.path}');
+      print('HTML content cached successfully at $filePath'); // 输出缓存文件路径
     } catch (e) {
       print('Failed to cache HTML content: $e');
     }
