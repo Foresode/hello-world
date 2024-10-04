@@ -54,7 +54,10 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
           },
           onWebResourceError: (error) {
             print('Failed to load page: $error');
-            _showErrorDialog(error.description);
+            if (error.errorCode == -2) {
+              // 捕获断网错误并避免 WebView 自动重试
+              _showNoConnectionMessage();
+            }
           },
         ),
       );
@@ -179,25 +182,6 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       builder: (context) => AlertDialog(
         title: Text('No Connection'),
         content: Text('No internet connection and no cached page available.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 显示 WebView 错误
-  void _showErrorDialog(String errorMessage) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Error'),
-        content: Text(errorMessage),
         actions: [
           TextButton(
             onPressed: () {
