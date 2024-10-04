@@ -37,13 +37,9 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
 
     // 初始化 WebViewController
     _controller = WebViewController()
-      ..clearCache()  // 清除 WebView 自带的缓存，避免干扰
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (url) {
-            print('Page started loading: $url');
-          },
           onPageFinished: (url) async {
             try {
               // 当页面加载完成时，缓存页面内容到本地
@@ -117,19 +113,22 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       url = 'https://' + url;
     }
 
-    // 1. 尝试加载本地缓存的页面
-    bool cacheLoaded = await _loadCachedPage(url);
-
-    // 2. 检查网络状态并加载在线页面，如果网络可用则替换缓存
+    // 1. 检查网络状态
     var connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult != ConnectivityResult.none) {
+
+    // 2. 无网络时加载缓存页面
+    if (connectivityResult == ConnectivityResult.none) {
+      print('No network, loading cached page...');
+      bool cacheLoaded = await _loadCachedPage(url);
+      if (!cacheLoaded) {
+        _showNoConnectionMessage(); // 没有网络且没有缓存时，显示提示
+      }
+    } else {
+      // 3. 有网络时加载在线页面
       print('Network available, loading online page...');
       _controller.loadRequest(Uri.parse(url)).then((_) {
         print('Online page loaded, caching new content...');
       });
-    } else if (!cacheLoaded) {
-      // 如果没有缓存且无网络，显示错误信息
-      _showNoConnectionMessage();
     }
   }
 
@@ -142,12 +141,14 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
         String cachedHtml = await file.readAsString();
         print('Loaded cached page successfully: $cachedHtml');
 
-        // 加载缓存页面，避免 WebView 发出网络请求
-        _controller.loadRequest(Uri.dataFromString(
-          cachedHtml,
-          mimeType: 'text/html',
-          encoding: Encoding.getByName('utf-8'),
-        ));
+        // 使用本地缓存内容加载 WebView
+        _controller.loadRequest(
+          Uri.dataFromString(
+            cachedHtml,
+            mimeType: 'text/html',
+            encoding: Encoding.getByName('utf-8'),
+          ),
+        );
         return true; // 成功加载缓存
       } else {
         print('No cached page available for this URL');
