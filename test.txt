@@ -209,4 +209,20 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       builder: (context) => AlertDialog(
         title: Text('No Connection'),
         content: Text('No internet connection and no cached page available.'),
-        actions:
+        actions: [
+          TextButton(
+            onPressed: () {
+              _isAlertShown = false;
+              Navigator.of(context).pop();
+            },
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _sanitizeUrl(String url) {
+    return url.replaceAll(RegExp(r'[^\w]'), '_');
+  }
+}
