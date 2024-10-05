@@ -67,6 +67,30 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
           },
         ),
       );
+
+    // 启动时检查缓存并加载缓存页面
+    _checkCacheOnStartup();
+  }
+
+  // 启动时检查缓存并加载
+  Future<void> _checkCacheOnStartup() async {
+    String url = _urlController.text.trim();
+
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+
+    bool cacheLoaded = await _loadCachedPage(url); // 优先加载缓存
+
+    if (!cacheLoaded) {
+      // 如果没有缓存，检查网络再加载在线页面
+      var connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult != ConnectivityResult.none) {
+        _controller.loadRequest(Uri.parse(url));
+      } else {
+        _showNoConnectionMessage();
+      }
+    }
   }
 
   @override
