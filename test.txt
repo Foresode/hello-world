@@ -30,7 +30,7 @@ class WebViewCachePage extends StatefulWidget {
 class _WebViewCachePageState extends State<WebViewCachePage> {
   late final WebViewController _controller;
   final TextEditingController _urlController = TextEditingController(text: 'https://example.com');
-  bool _isAlertShown = false; // 防止重复弹出对话框
+  bool _isAlertShown = false;
 
   @override
   void initState() {
@@ -49,7 +49,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
               ) as String;
 
               if (htmlContent.isNotEmpty) {
-                print('HTML content to cache: $htmlContent'); // 打印要缓存的 HTML 内容
+                print('HTML content to cache: $htmlContent');
                 await _cacheHtmlContent(_urlController.text, htmlContent);
                 print('Page cached successfully');
               } else {
@@ -62,7 +62,6 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
           onWebResourceError: (error) {
             print('Failed to load page: $error');
             if (error.errorCode == -2) {
-              // 捕获断网错误并避免 WebView 自动重试
               _showNoConnectionMessage();
             }
           },
@@ -73,7 +72,6 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     _checkCacheOnStartup();
   }
 
-  // 启动时检查缓存并加载
   Future<void> _checkCacheOnStartup() async {
     String url = _urlController.text.trim();
 
@@ -81,10 +79,9 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
       url = 'https://' + url;
     }
 
-    bool cacheLoaded = await _loadCachedPage(url); // 优先加载缓存
+    bool cacheLoaded = await _loadCachedPage(url);
 
     if (!cacheLoaded) {
-      // 如果没有缓存，检查网络再加载在线页面
       var connectivityResult = await Connectivity().checkConnectivity();
       if (connectivityResult != ConnectivityResult.none) {
         _controller.loadRequest(Uri.parse(url));
@@ -102,7 +99,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _checkCacheThenLoad, // 点击刷新时优先检查缓存
+            onPressed: _checkCacheThenLoad,
           ),
         ],
       ),
@@ -120,12 +117,12 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.url,
-                    onSubmitted: (_) => _checkCacheThenLoad(),  // 回车时优先检查缓存
+                    onSubmitted: (_) => _checkCacheThenLoad(),
                   ),
                 ),
                 IconButton(
                   icon: Icon(Icons.arrow_forward),
-                  onPressed: _checkCacheThenLoad, // 点击箭头时优先检查缓存
+                  onPressed: _checkCacheThenLoad,
                 ),
               ],
             ),
@@ -138,27 +135,22 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     );
   }
 
-  // 优先加载缓存页面，再检查网络并加载在线页面
   Future<void> _checkCacheThenLoad() async {
     String url = _urlController.text.trim();
 
-    // 如果用户输入的网址没有 http 前缀，自动添加
     if (!url.startsWith('http')) {
       url = 'https://' + url;
     }
 
-    // 1. 检查网络状态
     var connectivityResult = await Connectivity().checkConnectivity();
 
-    // 2. 无网络时加载缓存页面
     if (connectivityResult == ConnectivityResult.none) {
       print('No network, loading cached page...');
       bool cacheLoaded = await _loadCachedPage(url);
       if (!cacheLoaded && !_isAlertShown) {
-        _showNoConnectionMessage(); // 没有网络且没有缓存时，显示提示
+        _showNoConnectionMessage();
       }
     } else {
-      // 3. 有网络时加载在线页面
       print('Network available, loading online page...');
       _controller.loadRequest(Uri.parse(url)).then((_) {
         print('Online page loaded, caching new content...');
@@ -166,30 +158,24 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     }
   }
 
-  // 从本地缓存加载页面，返回是否成功加载缓存
   Future<bool> _loadCachedPage(String url) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
       final filePath = '${directory.path}/cached_${_sanitizeUrl(url)}.html';
       final file = File(filePath);
-      print('Attempting to load cached page from $filePath'); // 输出加载的缓存路径
+      print('Attempting to load cached page from $filePath');
 
       if (await file.exists()) {
         String cachedHtml = await file.readAsString();
-        print('Cached HTML content: $cachedHtml'); // 打印缓存内容用于调试
+        print('Cached HTML content: $cachedHtml');
 
-        // 使用本地缓存内容加载 WebView，并确保以 HTML 形式渲染
-        _controller.loadRequest(
-          Uri.dataFromString(
-            cachedHtml,
-            mimeType: 'text/html',
-            encoding: Encoding.getByName('utf-8'),
-          ),
-        );
-        return true; // 成功加载缓存
+        final String contentBase64 = base64Encode(const Utf8Encoder().convert(cachedHtml));
+        _controller.loadUrl('data:text/html;base64,$contentBase64'); // 使用 base64 格式加载 HTML
+
+        return true;
       } else {
         print('No cached page available for this URL');
-        return false; // 没有找到缓存
+        return false;
       }
     } catch (e) {
       print('Failed to load cached page: $e');
@@ -197,22 +183,20 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     }
   }
 
-  // 缓存 HTML 内容到本地文件
   Future<void> _cacheHtmlContent(String url, String content) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
       final filePath = '${directory.path}/cached_${_sanitizeUrl(url)}.html';
       final file = File(filePath);
       await file.writeAsString(content);
-      print('HTML content cached successfully at $filePath'); // 输出缓存文件路径
+      print('HTML content cached successfully at $filePath');
     } catch (e) {
       print('Failed to cache HTML content: $e');
     }
   }
 
-  // 显示无连接时的错误信息
   void _showNoConnectionMessage() {
-    if (_isAlertShown) return;  // 防止重复弹出对话框
+    if (_isAlertShown) return;
 
     _isAlertShown = true;
     showDialog(
@@ -233,7 +217,6 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
     );
   }
 
-  // 清理 URL 以便用作文件名
   String _sanitizeUrl(String url) {
     return url.replaceAll(RegExp(r'[^\w]'), '_');
   }
