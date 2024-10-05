@@ -177,7 +177,7 @@ class _WebViewCachePageState extends State<WebViewCachePage> {
         String cachedHtml = await file.readAsString();
         print('Cached page loaded successfully');
         
-        // 使用本地缓存内容加载 WebView
+        // 使用本地缓存内容加载 WebView，并确保以 HTML 形式渲染
         _controller.loadRequest(
           Uri.dataFromString(
             cachedHtml,
