@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:webview_flutter/webview_flutter.dart';  // 导入 webview_flutter 包
 
 class OfflineWebViewApp extends StatefulWidget {
   @override
@@ -10,26 +10,12 @@ class OfflineWebViewApp extends StatefulWidget {
 }
 
 class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   bool _isOnline = false;
 
   @override
   void initState() {
     super.initState();
-
-    // 在 Android 和 iOS 平台上启用 WebView
-    if (Platform.isAndroid || Platform.isIOS) {
-      WebView.platform = SurfaceAndroidWebView();  // 使用 SurfaceAndroidWebView 或 CupertinoWebView
-    }
-
-    // 初始化 WebView 控制器
-    _controller = WebViewController()
-      ..javascriptMode = JavascriptMode.unrestricted
-      ..onPageFinished.listen((String url) {
-        _checkNetworkStatus();
-      });
-
-    // 检查网络状态
     _checkNetworkStatus();
   }
 
@@ -42,14 +28,19 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
 
     if (_isOnline) {
       // 有网络时加载远程网页并缓存
-      _controller.loadUrl('https://example.com');
+      _controller?.loadUrl('https://example.com');
       _cacheWebPage();
     } else {
       // 无网络时加载本地缓存的网页
       String localHtml = await _loadHtmlFromLocal();
       if (localHtml.isNotEmpty) {
-        _controller.loadUrl(Uri.dataFromString(localHtml, mimeType: 'text/html', encoding: Encoding.getByName('utf-8')).toString());
+        _controller?.loadUrl(Uri.dataFromString(
+          localHtml,
+          mimeType: 'text/html',
+          encoding: Encoding.getByName('utf-8'),
+        ).toString());
       } else {
+        // 本地缓存为空时提示
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('No internet and no local cache available!'),
         ));
@@ -59,19 +50,15 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
 
   /// 将远程网页内容缓存到本地
   Future<void> _cacheWebPage() async {
-    try {
-      final htmlContent = await _controller.evaluateJavascript(
-          'document.documentElement.outerHTML');
-      if (htmlContent != null) {
-        final directory = await getApplicationDocumentsDirectory();
-        final file = File('${directory.path}/offline_page.html');
-        await file.writeAsString(htmlContent);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Page cached for offline use'),
-        ));
-      }
-    } catch (e) {
-      print('Error caching webpage: $e');
+    final htmlContent = await _controller?.runJavascriptReturningResult(
+        'document.documentElement.outerHTML');
+    if (htmlContent != null) {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/offline_page.html');
+      await file.writeAsString(htmlContent);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Page cached for offline use'),
+      ));
     }
   }
 
@@ -82,7 +69,6 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
       final file = File('${directory.path}/offline_page.html');
       return await file.readAsString();
     } catch (e) {
-      print('Error loading local HTML: $e');
       return '';
     }
   }
@@ -94,7 +80,10 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
         title: Text("Offline WebView Example"),
       ),
       body: WebView(
-        controller: _controller,
+        onWebViewCreated: (WebViewController webViewController) {
+          _controller = webViewController;
+        },
+        javascriptMode: JavascriptMode.unrestricted, // 支持 JavaScript
       ),
     );
   }
