@@ -10,7 +10,7 @@ class OfflineWebViewApp extends StatefulWidget {
 }
 
 class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
-  WebViewController? _controller;
+  late WebViewController _controller;
   bool _isOnline = false;
   bool _isLoading = true;
 
@@ -22,8 +22,14 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
 
   /// 初始化 WebView 控制器和检查网络状态
   Future<void> _initializeController() async {
+    // 等待 WebView 初始化完成
     await WebView.platformInitialize();
-    _controller = null;
+    
+    // 创建 WebView 控制器
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted); // 允许运行 JavaScript
+
+    // 检查网络状态
     await _checkNetworkStatus();
   }
 
@@ -35,24 +41,18 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
     });
 
     if (_isOnline) {
-      _controller?.loadUrl('https://example.com').then((_) {
-        setState(() {
-          _isLoading = false;
-        });
+      _controller.loadRequest(Uri.parse('https://example.com')).then((_) {
         _cacheWebPage();
       });
     } else {
       String localHtml = await _loadHtmlFromLocal();
       if (localHtml.isNotEmpty) {
-        _controller?.loadUrl(Uri.dataFromString(localHtml, mimeType: 'text/html', encoding: Encoding.getByName('utf-8')).toString()).then((_) {
-          setState(() {
-            _isLoading = false;
-          });
-        });
+        _controller.loadUrl(Uri.dataFromString(
+          localHtml,
+          mimeType: 'text/html',
+          encoding: Encoding.getByName('utf-8'),
+        ).toString());
       } else {
-        setState(() {
-          _isLoading = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('No internet and no local cache available!'),
         ));
@@ -63,7 +63,7 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
   /// 将远程网页内容缓存到本地
   Future<void> _cacheWebPage() async {
     try {
-      final htmlContent = await _controller?.evaluateJavascript('document.documentElement.outerHTML');
+      final htmlContent = await _controller.runJavaScriptReturningResult('document.documentElement.outerHTML');
       if (htmlContent != null) {
         final directory = await getApplicationDocumentsDirectory();
         final file = File('${directory.path}/offline_page.html');
@@ -95,32 +95,22 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
       appBar: AppBar(
         title: Text("Offline WebView Example"),
       ),
-      body: Stack(
-        children: [
-          WebView(
-            initialUrl: '',
-            onWebViewCreated: (WebViewController webViewController) {
-              if (_controller == null) {
-                _controller = webViewController;
-              }
-            },
-            javascriptMode: JavascriptMode.unrestricted,
-            onPageStarted: (url) {
-              setState(() {
-                _isLoading = true;
-              });
-            },
-            onPageFinished: (url) {
-              setState(() {
-                _isLoading = false;
-              });
-            },
-          ),
-          if (_isLoading)
-            Center(
-              child: CircularProgressIndicator(),
-            ),
-        ],
+      body: WebView(
+        initialUrl: '',
+        onWebViewCreated: (WebViewController webViewController) {
+          _controller = webViewController;
+        },
+        javascriptMode: JavascriptMode.unrestricted, // 允许运行 JavaScript
+        onPageStarted: (url) {
+          setState(() {
+            _isLoading = true;
+          });
+        },
+        onPageFinished: (url) {
+          setState(() {
+            _isLoading = false;
+          });
+        },
       ),
     );
   }
