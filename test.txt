@@ -16,7 +16,13 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
   @override
   void initState() {
     super.initState();
-    // 初始化 WebView 控制器
+
+    // 在 Android 平台上必须在初始化 WebView 之前调用
+    if (Platform.isAndroid) {
+      WebView.platform = SurfaceAndroidWebView();
+    }
+
+    // 检查网络状态
     _checkNetworkStatus();
   }
 
@@ -47,15 +53,19 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
 
   /// 将远程网页内容缓存到本地
   Future<void> _cacheWebPage() async {
-    final htmlContent = await _controller.runJavascriptReturningResult(
-        'document.documentElement.outerHTML');
-    if (htmlContent != null) {
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/offline_page.html');
-      await file.writeAsString(htmlContent);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Page cached for offline use'),
-      ));
+    try {
+      final htmlContent = await _controller.runJavascriptReturningResult(
+          'document.documentElement.outerHTML');
+      if (htmlContent != null) {
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/offline_page.html');
+        await file.writeAsString(htmlContent);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Page cached for offline use'),
+        ));
+      }
+    } catch (e) {
+      print('Error caching webpage: $e');
     }
   }
 
@@ -66,6 +76,7 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
       final file = File('${directory.path}/offline_page.html');
       return await file.readAsString();
     } catch (e) {
+      print('Error loading local HTML: $e');
       return '';
     }
   }
