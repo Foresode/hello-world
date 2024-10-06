@@ -17,12 +17,14 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
   late WebViewController _controller;
   bool _isOnline = false;
   bool _isLoading = true; // 状态：加载中
-  final String _initialUrl = 'https://www.baidu.com'; // 初始网页 URL
+  String _initialUrl = 'https://www.baidu.com'; // 初始网页 URL
+  final TextEditingController _urlController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _initializeController();
+    _urlController.text = _initialUrl; // 设置输入框的初始值
   }
 
   Future<void> _initializeController() async {
@@ -189,6 +191,14 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
     });
   }
 
+  void _updateUrl() {
+    final newUrl = _urlController.text;
+    if (newUrl.isNotEmpty) {
+      _initialUrl = newUrl;
+      _checkNetworkStatus(); // 重新检查网络状态并加载新 URL
+    }
+  }
+
   @override
   flutter.Widget build(flutter.BuildContext context) {
     return flutter.Scaffold(
@@ -203,9 +213,28 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: flutter.CircularProgressIndicator()) // 加载指示器
-          : WebViewWidget(controller: _controller),
+      body: flutter.Column(
+        children: [
+          flutter.Padding(
+            padding: const flutter.EdgeInsets.all(8.0),
+            child: flutter.TextField(
+              controller: _urlController,
+              decoration: flutter.InputDecoration(
+                labelText: 'Enter URL',
+                suffixIcon: flutter.IconButton(
+                  icon: flutter.Icon(flutter.Icons.navigate_next),
+                  onPressed: _updateUrl,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? Center(child: flutter.CircularProgressIndicator()) // 加载指示器
+                : WebViewWidget(controller: _controller),
+          ),
+        ],
+      ),
     );
   }
 }
