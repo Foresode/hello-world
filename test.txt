@@ -98,22 +98,8 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
       ),
       body: Stack(
         children: [
-          WebView(
-            initialUrl: '',
-            onWebViewCreated: (WebViewController webViewController) {
-              _controller = webViewController;
-            },
-            javascriptMode: JavascriptMode.unrestricted,
-            onPageStarted: (url) {
-              setState(() {
-                _isLoading = true;
-              });
-            },
-            onPageFinished: (url) {
-              setState(() {
-                _isLoading = false;
-              });
-            },
+          WebViewWidget(
+            controller: _controller, // Use the controller directly here
           ),
           if (_isLoading)
             Center(
