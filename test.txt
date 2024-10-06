@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class OfflineWebViewApp extends StatefulWidget {
   @override
@@ -14,7 +15,6 @@ class OfflineWebViewApp extends StatefulWidget {
 class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
   late WebViewController _controller;
   bool _isOnline = false;
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -23,9 +23,11 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
   }
 
   Future<void> _initializeController() async {
+    // 初始化 WebView 控制器
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
     
+    // 检查网络状态
     await _checkNetworkStatus();
   }
 
@@ -40,11 +42,11 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
     } else {
       String localHtml = await _loadHtmlFromLocal();
       if (localHtml.isNotEmpty) {
-        _controller.loadRequest(Uri.dataFromString(
+        _controller.loadUrl(Uri.dataFromString(
           localHtml,
           mimeType: 'text/html',
           encoding: utf8,
-        ));
+        ).toString());
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('No internet and no local cache available!'),
@@ -94,16 +96,19 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
         }
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Page and resources cached for offline use'),
-      ));
+      // 更新资源链接
+      _updateResourceLinks(document, directory);
 
       // 加载本地 HTML
       String localHtml = await _loadHtmlFromLocal();
-      _controller.loadRequest(Uri.dataFromString(
+      _controller.loadUrl(Uri.dataFromString(
         localHtml,
         mimeType: 'text/html',
         encoding: utf8,
+      ).toString());
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Page and resources cached for offline use'),
       ));
     } else {
       print('Failed to download the webpage.');
@@ -117,11 +122,40 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
         final fileName = url.split('/').last;
         final file = File('${directory.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
-
         print('Downloaded: $url');
       }
     } catch (e) {
       print('Error downloading resource: $e');
+    }
+  }
+
+  void _updateResourceLinks(html_parser.Document document, Directory directory) {
+    final links = document.getElementsByTagName('link');
+    final scripts = document.getElementsByTagName('script');
+    final images = document.getElementsByTagName('img');
+
+    for (var link in links) {
+      final href = link.attributes['href'];
+      if (href != null) {
+        final fileName = href.split('/').last; // 取文件名
+        link.attributes['href'] = fileName; // 更新为本地文件名
+      }
+    }
+
+    for (var script in scripts) {
+      final src = script.attributes['src'];
+      if (src != null) {
+        final fileName = src.split('/').last;
+        script.attributes['src'] = fileName; // 更新为本地文件名
+      }
+    }
+
+    for (var img in images) {
+      final src = img.attributes['src'];
+      if (src != null) {
+        final fileName = src.split('/').last;
+        img.attributes['src'] = fileName; // 更新为本地文件名
+      }
     }
   }
 
@@ -142,8 +176,11 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
       appBar: AppBar(
         title: Text("Offline WebView Example"),
       ),
-      body: WebViewWidget(
-        controller: _controller,
+      body: WebView(
+        onWebViewCreated: (WebViewController webViewController) {
+          _controller = webViewController;
+        },
+        javascriptMode: JavascriptMode.unrestricted,
       ),
     );
   }
