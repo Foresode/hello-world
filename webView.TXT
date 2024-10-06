@@ -1,0 +1,217 @@
+import 'package:flutter/material.dart' as flutter;
+import 'package:webview_flutter/webview_flutter.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:html/parser.dart' as html_parser;
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+class OfflineWebViewApp extends flutter.StatefulWidget {
+  @override
+  _OfflineWebViewAppState createState() => _OfflineWebViewAppState();
+}
+
+class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
+  late WebViewController _controller;
+  bool _isOnline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 如果你需要在 Android 上启用 Hybrid Composition
+    if (Platform.isAndroid) {
+      WebView.platform = SurfaceAndroidWebView();
+    }
+    _initializeController();
+  }
+
+  Future<void> _initializeController() async {
+    // 初始化 WebView 控制器
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+
+    // 检查网络状态
+    await _checkNetworkStatus();
+  }
+
+  Future<void> _checkNetworkStatus() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    setState(() {
+      _isOnline = connectivityResult != ConnectivityResult.none;
+    });
+
+    if (_isOnline) {
+      await _downloadAndCacheWebPage('https://www.baidu.com');
+    } else {
+      String localHtml = await _loadHtmlFromLocal();
+      if (localHtml.isNotEmpty) {
+        _controller.loadRequest(
+          LoadRequestParams(
+            uri: Uri.dataFromString(
+              localHtml,
+              mimeType: 'text/html',
+              encoding: utf8,
+            ),
+          ),
+        );
+      } else {
+        flutter.ScaffoldMessenger.of(context).showSnackBar(flutter.SnackBar(
+          content: flutter.Text('No internet and no local cache available!'),
+        ));
+      }
+    }
+  }
+
+  Future<void> _downloadAndCacheWebPage(String url) async {
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      // 解析 HTML
+      final document = html_parser.parse(response.body);
+
+      // 保存 HTML
+      final directory = await getApplicationDocumentsDirectory();
+      final htmlFile = File('${directory.path}/offline_page.html');
+      await htmlFile.writeAsString(document.outerHtml);
+
+      // 处理资源
+      final scripts = document.getElementsByTagName('script');
+      final links = document.getElementsByTagName('link');
+      final images = document.getElementsByTagName('img');
+
+      // 下载 CSS 文件
+      for (var link in links) {
+        final href = link.attributes['href'];
+        if (href != null && (href.endsWith('.css') || href.endsWith('.js'))) {
+          await _downloadResource(href, directory);
+        }
+      }
+
+      // 下载 JavaScript 文件
+      for (var script in scripts) {
+        final src = script.attributes['src'];
+        if (src != null) {
+          await _downloadResource(src, directory);
+        }
+      }
+
+      // 下载图片
+      for (var img in images) {
+        final src = img.attributes['src'];
+        if (src != null) {
+          await _downloadResource(src, directory);
+        }
+      }
+
+      // 更新资源链接
+      _updateResourceLinks(document, directory);
+
+      // 保存更新后的 HTML
+      await htmlFile.writeAsString(document.outerHtml);
+
+      // 加载本地 HTML
+      String localHtml = await _loadHtmlFromLocal();
+      _controller.loadRequest(
+        LoadRequestParams(
+          uri: Uri.dataFromString(
+            localHtml,
+            mimeType: 'text/html',
+            encoding: utf8,
+          ),
+        ),
+      );
+
+      flutter.ScaffoldMessenger.of(context).showSnackBar(flutter.SnackBar(
+        content: flutter.Text('Page and resources cached for offline use'),
+      ));
+    } else {
+      print('Failed to download the webpage.');
+    }
+  }
+
+  Future<void> _downloadResource(String url, Directory directory) async {
+    try {
+      Uri uri = Uri.parse(url);
+      // 处理相对路径
+      if (!uri.hasScheme) {
+        // 假设所有资源都来自于百度，可以根据实际情况调整
+        uri = Uri.parse('https://www.baidu.com$url');
+      }
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final fileName = uri.pathSegments.last;
+        final file = File('${directory.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes);
+        print('Downloaded: $url');
+      }
+    } catch (e) {
+      print('Error downloading resource: $e');
+    }
+  }
+
+  void _updateResourceLinks(html_parser.Document document, Directory directory) {
+    final links = document.getElementsByTagName('link');
+    final scripts = document.getElementsByTagName('script');
+    final images = document.getElementsByTagName('img');
+
+    for (var link in links) {
+      final href = link.attributes['href'];
+      if (href != null) {
+        final fileName = href.split('/').last;
+        link.attributes['href'] = fileName;
+      }
+    }
+
+    for (var script in scripts) {
+      final src = script.attributes['src'];
+      if (src != null) {
+        final fileName = src.split('/').last;
+        script.attributes['src'] = fileName;
+      }
+    }
+
+    for (var img in images) {
+      final src = img.attributes['src'];
+      if (src != null) {
+        final fileName = src.split('/').last;
+        img.attributes['src'] = fileName;
+      }
+    }
+  }
+
+  Future<String> _loadHtmlFromLocal() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/offline_page.html');
+      return await file.readAsString();
+    } catch (e) {
+      print('Error loading local HTML: $e');
+      return '';
+    }
+  }
+
+  @override
+  flutter.Widget build(flutter.BuildContext context) {
+    return flutter.Scaffold(
+      appBar: flutter.AppBar(
+        title: flutter.Text("Offline WebView Example"),
+        actions: [
+          flutter.IconButton(
+            icon: flutter.Icon(flutter.Icons.refresh),
+            onPressed: () {
+              _checkNetworkStatus();
+            },
+          ),
+        ],
+      ),
+      body: WebViewWidget(controller: _controller),
+    );
+  }
+}
+
+void main() {
+  runApp(flutter.MaterialApp(
+    home: OfflineWebViewApp(),
+  ));
+}
