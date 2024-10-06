@@ -19,19 +19,13 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
   @override
   void initState() {
     super.initState();
-    // 如果你需要在 Android 上启用 Hybrid Composition
-    if (Platform.isAndroid) {
-      WebView.platform = SurfaceAndroidWebView();
-    }
     _initializeController();
   }
 
   Future<void> _initializeController() async {
-    // 初始化 WebView 控制器
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
 
-    // 检查网络状态
     await _checkNetworkStatus();
   }
 
@@ -47,7 +41,7 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
       String localHtml = await _loadHtmlFromLocal();
       if (localHtml.isNotEmpty) {
         _controller.loadRequest(
-          LoadRequestParams(
+          LoadRequest(
             uri: Uri.dataFromString(
               localHtml,
               mimeType: 'text/html',
@@ -80,7 +74,7 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
       final links = document.getElementsByTagName('link');
       final images = document.getElementsByTagName('img');
 
-      // 下载 CSS 文件
+      // 下载 CSS 和 JavaScript 文件
       for (var link in links) {
         final href = link.attributes['href'];
         if (href != null && (href.endsWith('.css') || href.endsWith('.js'))) {
@@ -88,7 +82,6 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
         }
       }
 
-      // 下载 JavaScript 文件
       for (var script in scripts) {
         final src = script.attributes['src'];
         if (src != null) {
@@ -113,7 +106,7 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
       // 加载本地 HTML
       String localHtml = await _loadHtmlFromLocal();
       _controller.loadRequest(
-        LoadRequestParams(
+        LoadRequest(
           uri: Uri.dataFromString(
             localHtml,
             mimeType: 'text/html',
@@ -135,7 +128,6 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
       Uri uri = Uri.parse(url);
       // 处理相对路径
       if (!uri.hasScheme) {
-        // 假设所有资源都来自于百度，可以根据实际情况调整
         uri = Uri.parse('https://www.baidu.com$url');
       }
       final response = await http.get(uri);
