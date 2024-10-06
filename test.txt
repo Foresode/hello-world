@@ -10,12 +10,13 @@ class OfflineWebViewApp extends StatefulWidget {
 }
 
 class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
-  WebViewController? _controller;
+  late WebViewController _controller;
   bool _isOnline = false;
 
   @override
   void initState() {
     super.initState();
+    // 初始化 WebView 控制器
     _checkNetworkStatus();
   }
 
@@ -28,17 +29,13 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
 
     if (_isOnline) {
       // 有网络时加载远程网页并缓存
-      _controller?.loadUrl('https://example.com');
+      _controller.loadRequest(Uri.parse('https://example.com'));
       _cacheWebPage();
     } else {
       // 无网络时加载本地缓存的网页
       String localHtml = await _loadHtmlFromLocal();
       if (localHtml.isNotEmpty) {
-        _controller?.loadUrl(Uri.dataFromString(
-          localHtml,
-          mimeType: 'text/html',
-          encoding: Encoding.getByName('utf-8'),
-        ).toString());
+        _controller.loadHtmlString(localHtml);
       } else {
         // 本地缓存为空时提示
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -50,7 +47,7 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
 
   /// 将远程网页内容缓存到本地
   Future<void> _cacheWebPage() async {
-    final htmlContent = await _controller?.runJavascriptReturningResult(
+    final htmlContent = await _controller.runJavascriptReturningResult(
         'document.documentElement.outerHTML');
     if (htmlContent != null) {
       final directory = await getApplicationDocumentsDirectory();
@@ -80,10 +77,11 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
         title: Text("Offline WebView Example"),
       ),
       body: WebView(
+        initialUrl: '',
         onWebViewCreated: (WebViewController webViewController) {
           _controller = webViewController;
         },
-        javascriptMode: JavascriptMode.unrestricted, // 支持 JavaScript
+        javascriptMode: JavascriptMode.unrestricted, // 允许运行 JavaScript
       ),
     );
   }
