@@ -191,11 +191,11 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
     });
   }
 
-  void _updateUrl() {
+  void _updateUrl() async {
     final newUrl = _urlController.text;
     if (newUrl.isNotEmpty) {
       _initialUrl = newUrl;
-      _checkNetworkStatus(); // 重新检查网络状态并加载新 URL
+      await _checkNetworkStatus(); // 重新检查网络状态并加载新 URL
     }
   }
 
