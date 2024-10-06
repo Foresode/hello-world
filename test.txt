@@ -3,6 +3,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';  // Android 平台的 WebView
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart'; // iOS 平台的 WebView
 
 class OfflineWebViewApp extends StatefulWidget {
   @override
@@ -17,9 +19,11 @@ class _OfflineWebViewAppState extends State<OfflineWebViewApp> {
   void initState() {
     super.initState();
 
-    // 在 Android 平台上必须在初始化 WebView 之前调用
+    // 判断当前平台
     if (Platform.isAndroid) {
-      WebView.platform = SurfaceAndroidWebView();
+      WebView.platform = AndroidWebView();  // 使用 Android 平台的 WebView
+    } else if (Platform.isIOS) {
+      WebView.platform = IOSWebView();  // 使用 iOS 平台的 WebView
     }
 
     // 检查网络状态
