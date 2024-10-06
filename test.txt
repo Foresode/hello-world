@@ -23,6 +23,16 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
     if (Platform.isAndroid) {
       WebView.platform = SurfaceAndroidWebView();
     }
+    _initializeController();
+  }
+
+  Future<void> _initializeController() async {
+    // 初始化 WebView 控制器
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+
+    // 检查网络状态
+    await _checkNetworkStatus();
   }
 
   Future<void> _checkNetworkStatus() async {
@@ -195,14 +205,7 @@ class _OfflineWebViewAppState extends flutter.State<OfflineWebViewApp> {
           ),
         ],
       ),
-      body: WebView(
-        initialUrl: 'about:blank',
-        javascriptMode: JavascriptMode.unrestricted,
-        onWebViewCreated: (WebViewController webViewController) {
-          _controller = webViewController;
-          _checkNetworkStatus(); // 在 WebView 创建后检查网络状态并加载内容
-        },
-      ),
+      body: WebViewWidget(controller: _controller),
     );
   }
 }
